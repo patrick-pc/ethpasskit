@@ -1,6 +1,6 @@
 import React from 'react'
 
-interface GeneratePassProps {
+export interface GeneratePassProps {
   label: string
   contractAddress: string
 }
