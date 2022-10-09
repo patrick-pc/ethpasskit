@@ -1,7 +1,7 @@
 import React from 'react'
+import '../../styles/tailwind.css'
 
 export interface GeneratePassProps {
-  label: string
   contractAddress: string
 }
 
@@ -10,7 +10,14 @@ const GeneratePass = (props: GeneratePassProps) => {
     console.log(props.contractAddress)
   }
 
-  return <button onClick={handleClick}>{props.label}</button>
+  return (
+    <button
+      className='bg-black text-white rounded-lg px-4 py-2'
+      onClick={handleClick}
+    >
+      Generate Pass
+    </button>
+  )
 }
 
 export default GeneratePass

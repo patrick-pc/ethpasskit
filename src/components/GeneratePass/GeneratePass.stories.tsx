@@ -14,6 +14,5 @@ const Template: ComponentStory<typeof GeneratePass> = (args) => (
 
 export const Button = Template.bind({})
 Button.args = {
-  label: 'Generate Pass',
-  contractAddress: '123123123123',
+  contractAddress: '0x3cd266509d127d0eac42f4474f57d0526804b44e',
 }
