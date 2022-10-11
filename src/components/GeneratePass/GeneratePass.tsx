@@ -2,9 +2,8 @@ import React, { useState } from 'react'
 import { ethers } from 'ethers'
 import { Ring } from '@uiball/loaders'
 import QRCode from 'qrcode'
-import '../../styles/tailwind.css'
-
 import Modal from '../Modal'
+import '../../styles/tailwind.css'
 
 export interface GeneratePassProps {
   apiUrl: string
@@ -52,9 +51,7 @@ const GeneratePass = (props: GeneratePassProps) => {
     let signature = ''
     let signatureMessage = ''
     try {
-      const provider = new ethers.providers.Web3Provider(
-        (window as any).ethereum
-      )
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum)
       const signer = provider.getSigner()
       signatureMessage = `Sign this message to generate a pass with ethpass. \n${Date.now()}`
       signature = await signer.signMessage(signatureMessage)
@@ -127,79 +124,60 @@ const GeneratePass = (props: GeneratePassProps) => {
   return (
     <>
       <button
-        className='bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition duration-100 ease-in-out px-3 py-1.5'
+        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition duration-100 ease-in-out px-3 py-1.5"
         onClick={validateHolder}
       >
         Generate Pass
       </button>
 
-      <Modal
-        title={modal}
-        isActive={isActive}
-        onClose={() => setIsActive(false)}
-      >
+      <Modal title={modal} isActive={isActive} onClose={() => setIsActive(false)}>
         {modal === 'Select NFT' && (
-          <div className='flex overflow-x-auto w-full'>
+          <div className="flex overflow-x-auto w-full">
             {ownedNfts.length === 0 ? (
-              <span className='flex items-center justify-center text-sm opacity-50 w-full'>
+              <span className="flex items-center justify-center text-sm opacity-50 w-full">
                 Oops! Looks like you have no eligible NFTs.
               </span>
             ) : (
               <div
                 className={`flex flex-shrink-0 items-center ${
-                  ownedNfts.length === 1
-                    ? 'justify-center w-full'
-                    : 'justify-start'
+                  ownedNfts.length === 1 ? 'justify-center w-full' : 'justify-start'
                 } gap-4`}
               >
-                {ownedNfts.map(
-                  (nft: {
-                    id: { tokenId: string }
-                    media: [{ gateway: string }]
-                  }) => {
-                    return (
-                      <button
-                        className='rounded-xl'
-                        onClick={() => getTokenId(parseInt(nft.id.tokenId))}
-                        key={parseInt(nft.id.tokenId)}
-                      >
-                        {nft.media[0].gateway.slice(-4) === '.mp4' ? (
-                          <video
-                            className='w-40 h-40 bg-black border rounded-xl'
-                            autoPlay
-                            loop
-                            muted
-                          >
-                            <source
-                              src={nft.media[0].gateway}
-                              type='video/mp4'
-                            />
-                          </video>
-                        ) : (
-                          <img
-                            className='w-40 h-40 bg-black border rounded-xl'
-                            src={nft.media[0].gateway}
-                          />
-                        )}
-                      </button>
-                    )
-                  }
-                )}
+                {ownedNfts.map((nft: { id: { tokenId: string }; media: [{ gateway: string }] }) => {
+                  return (
+                    <button
+                      className="rounded-xl"
+                      onClick={() => getTokenId(parseInt(nft.id.tokenId))}
+                      key={parseInt(nft.id.tokenId)}
+                    >
+                      {nft.media[0].gateway.slice(-4) === '.mp4' ? (
+                        <video className="w-40 h-40 bg-black border rounded-xl" autoPlay loop muted>
+                          <source src={nft.media[0].gateway} type="video/mp4" />
+                        </video>
+                      ) : (
+                        <img
+                          className="w-40 h-40 bg-black border rounded-xl"
+                          src={nft.media[0].gateway}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
         )}
 
         {modal === 'Select Platform' && (
-          <div className='flex flex-col w-full gap-4'>
+          <div className="flex flex-col w-full gap-4">
             <button
-              className='bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4'
+              className="bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4"
               onClick={() => generatePass('apple')}
             >
               Apple Wallet
             </button>
             <button
-              className='bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4'
+              className="bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4"
               onClick={() => generatePass('google')}
             >
               Google Wallet
@@ -208,60 +186,54 @@ const GeneratePass = (props: GeneratePassProps) => {
         )}
 
         {modal === 'Signature Request' && (
-          <div className='flex flex-col items-center justify-center w-full gap-4'>
-            <Ring size={60} color='#4F46E5' />
+          <div className="flex flex-col items-center justify-center w-full gap-4">
+            <Ring size={60} color="#4F46E5" />
 
-            <div className='flex flex-col text-center gap-2'>
-              <p className='font-medium'>Waiting for signature...</p>
-              <p className='text-xs opacity-50'>
-                Signing is a safe, cost-less transaction that does not in any
-                way give us permission to access your tokens or perform
-                transactions with your wallet.
+            <div className="flex flex-col text-center gap-2">
+              <p className="font-medium">Waiting for signature...</p>
+              <p className="text-xs opacity-50">
+                Signing is a safe, cost-less transaction that does not in any way give us permission
+                to access your tokens or perform transactions with your wallet.
               </p>
             </div>
           </div>
         )}
 
         {modal === 'Generating Pass' && (
-          <div className='flex flex-col items-center justify-center w-full'>
+          <div className="flex flex-col items-center justify-center w-full">
             <img
-              className='h-40 w-40 rounded-xl'
-              src='https://github.com/Firemoon777/qrtetris/raw/master/res/qr.gif'
+              className="h-40 w-40 rounded-xl"
+              src="https://github.com/Firemoon777/qrtetris/raw/master/res/qr.gif"
             />
           </div>
         )}
 
         {modal === 'Pass Generated' && (
-          <div className='flex flex-col text-center w-full'>
-            <div className='flex flex-col gap-4'>
-              <p className='text-sm opacity-50'>{`Scan QR code using your ${
+          <div className="flex flex-col text-center w-full">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm opacity-50">{`Scan QR code using your ${
                 platform.toLowerCase() === 'apple' ? 'Apple' : 'Android'
               } device.`}</p>
-              <div className='flex justify-center w-250 h-250'>
-                <img className='rounded-lg' src={qrCode} />
+              <div className="flex justify-center w-250 h-250">
+                <img className="rounded-lg" src={qrCode} />
               </div>
 
-              <p className='text-sm opacity-50'>
+              <p className="text-sm opacity-50">
                 Or tap below to download directly on your mobile device.
               </p>
               <a
-                className='flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2'
+                className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
                 href={fileUrl}
                 download
               >
                 <img
-                  className='h-6'
+                  className="h-6"
                   src={`https://nwpass.vercel.app/img/${
-                    platform && platform.toLowerCase() === 'apple'
-                      ? 'apple'
-                      : 'google'
+                    platform && platform.toLowerCase() === 'apple' ? 'apple' : 'google'
                   }-wallet.png`}
                 />
                 <p>
-                  Add to{' '}
-                  {platform && platform.toLowerCase() === 'apple'
-                    ? 'Apple'
-                    : 'Google'}{' '}
+                  Add to {platform && platform.toLowerCase() === 'apple' ? 'Apple' : 'Google'}{' '}
                   Wallet
                 </p>
               </a>
@@ -270,8 +242,8 @@ const GeneratePass = (props: GeneratePassProps) => {
         )}
 
         {modal === 'Error' && (
-          <div className='flex flex-col items-center justify-center w-full'>
-            <p className='text-sm opacity-50'>{errorMessage}</p>
+          <div className="flex flex-col items-center justify-center w-full">
+            <p className="text-sm opacity-50">{errorMessage}</p>
           </div>
         )}
       </Modal>

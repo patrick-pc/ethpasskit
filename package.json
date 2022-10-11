@@ -1,6 +1,6 @@
 {
   "name": "@web3slinger/ethpasskit",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "An ethpass component library.",
   "scripts": {
     "rollup": "rollup -c",

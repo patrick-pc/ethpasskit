@@ -8,9 +8,7 @@ export default {
   component: GeneratePass,
 } as ComponentMeta<typeof GeneratePass>
 
-const Template: ComponentStory<typeof GeneratePass> = (args) => (
-  <GeneratePass {...args} />
-)
+const Template: ComponentStory<typeof GeneratePass> = (args) => <GeneratePass {...args} />
 
 export const Button = Template.bind({})
 Button.args = {
