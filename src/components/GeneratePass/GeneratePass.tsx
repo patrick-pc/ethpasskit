@@ -29,7 +29,7 @@ const GeneratePass = (props: GeneratePassProps) => {
     setModal('Select NFT')
 
     const baseURL =
-      props.chainId === 1
+      props.chainId == 1
         ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
         : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
     const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${props.contractAddress}`
