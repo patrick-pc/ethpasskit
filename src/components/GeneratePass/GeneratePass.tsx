@@ -1,25 +1,31 @@
 import React, { useState } from 'react'
 import { ethers } from 'ethers'
-import { Ring } from '@uiball/loaders'
+import { Ring, RaceBy } from '@uiball/loaders'
 import QRCode from 'qrcode'
 import Modal from '../Modal'
 import '../../styles/tailwind.css'
 
 export interface GeneratePassProps {
-  apiUrl: string
+  passName: string
+  ethpassApiKey: string
   contractAddress: string
   chainId: number
 }
 
-const GeneratePass = (props: GeneratePassProps) => {
+const GeneratePass: React.FC<GeneratePassProps> = ({
+  passName,
+  ethpassApiKey,
+  contractAddress,
+  chainId,
+}) => {
   const [isActive, setIsActive] = useState(false)
   const [ownedNfts, setOwnedNfts] = useState([])
   const [tokenId, setTokenId] = useState(-1)
-  const [modal, setModal] = useState('')
   const [platform, setPlatform] = useState('')
   const [fileUrl, setFileUrl] = useState('')
   const [qrCode, setQRCode] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [modal, setModal] = useState('')
 
   const validateHolder = async () => {
     const provider = new ethers.providers.Web3Provider((window as any).ethereum)
@@ -28,11 +34,12 @@ const GeneratePass = (props: GeneratePassProps) => {
     setIsActive(true)
     setModal('Select NFT')
 
+    // Get owned NFTs
     const baseURL =
-      props.chainId == 1
+      chainId == 1
         ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
         : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-    const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${props.contractAddress}`
+    const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${contractAddress}`
     const { ownedNfts } = await fetch(fetchURL).then((nfts) => nfts.json())
 
     setOwnedNfts(ownedNfts)
@@ -64,22 +71,76 @@ const GeneratePass = (props: GeneratePassProps) => {
 
     setModal('Generating Pass')
 
-    // Send request
-    const payload = {
-      contractAddress: props.contractAddress,
-      tokenId: tokenId,
-      chainId: props.chainId,
-      platform: platform,
-      signature,
-      signatureMessage,
+    // Pass details
+    let pass
+    if (platform === 'apple') {
+      pass = {
+        labelColor: 'rgb(70,70,220)',
+        backgroundColor: 'rgb(255,255,255)',
+        foregroundColor: 'rgb(0,0,0)',
+        description: passName,
+        headerFields: [],
+        primaryFields: [
+          {
+            key: 'primary1',
+            label: 'Pass',
+            value: passName,
+            textAlignment: 'PKTextAlignmentNatural',
+          },
+        ],
+        secondaryFields: [
+          {
+            key: 'secondary1',
+            label: 'Contract Address',
+            value: `${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`,
+            textAlignment: 'PKTextAlignmentLeft',
+          },
+          {
+            key: 'secondary2',
+            label: 'Token ID',
+            value: tokenId,
+            textAlignment: 'PKTextAlignmentLeft',
+          },
+          {
+            key: 'secondary3',
+            label: 'Chain ID',
+            value: chainId,
+            textAlignment: 'PKTextAlignmentLeft',
+          },
+        ],
+        auxiliaryFields: [],
+        backFields: [],
+      }
+    } else {
+      pass = {
+        messages: [],
+      }
     }
 
+    // Request body
+    const payload = {
+      pass,
+      signature,
+      signatureMessage,
+      platform: platform,
+      nft: {
+        contractAddress: contractAddress,
+        tokenId: tokenId,
+      },
+      chain: {
+        name: 'evm',
+        network: chainId,
+      },
+    }
+
+    // Send request
     try {
-      const response = await fetch(props.apiUrl, {
+      const response = await fetch('https://api.ethpass.xyz/api/v0/passes', {
         method: 'POST',
         body: JSON.stringify(payload),
         headers: new Headers({
           'content-type': 'application/json',
+          'X-API-KEY': ethpassApiKey,
         }),
       })
 
@@ -205,6 +266,7 @@ const GeneratePass = (props: GeneratePassProps) => {
               className="h-40 w-40 rounded-xl"
               src="https://github.com/Firemoon777/qrtetris/raw/master/res/qr.gif"
             />
+            <RaceBy size={125} lineWeight={1} />
           </div>
         )}
 
@@ -215,7 +277,7 @@ const GeneratePass = (props: GeneratePassProps) => {
                 platform.toLowerCase() === 'apple' ? 'Apple' : 'Android'
               } device.`}</p>
               <div className="flex justify-center w-250 h-250">
-                <img className="rounded-lg" src={qrCode} />
+                <img className="max-h-[250px] max-w-[250px] rounded-lg" src={qrCode} />
               </div>
 
               <p className="text-sm opacity-50">
