@@ -1,9 +1,10 @@
-import resolve from '@rollup/plugin-node-resolve'
-import commonjs from '@rollup/plugin-commonjs'
-import typescript from '@rollup/plugin-typescript'
-import dts from 'rollup-plugin-dts'
-import postcss from 'rollup-plugin-postcss'
 import builtins from 'rollup-plugin-node-builtins'
+import commonjs from '@rollup/plugin-commonjs'
+import dts from 'rollup-plugin-dts'
+import json from '@rollup/plugin-json'
+import postcss from 'rollup-plugin-postcss'
+import resolve from '@rollup/plugin-node-resolve'
+import typescript from '@rollup/plugin-typescript'
 
 const packageJson = require('./package.json')
 
@@ -23,10 +24,12 @@ export default [
         sourcemap: true,
       },
     ],
+    external: ['http', 'https', 'react', 'react-dom'],
     plugins: [
       builtins(),
       resolve({ preferBuiltins: true }),
       commonjs(),
+      json(),
       typescript({ tsconfig: './tsconfig.json' }),
       postcss({
         config: {
@@ -39,7 +42,6 @@ export default [
         },
       }),
     ],
-    external: ['react', 'react-dom'],
   },
   {
     input: 'dist/esm/index.d.ts',

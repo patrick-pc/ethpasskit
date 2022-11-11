@@ -1,15 +1,16 @@
 import React, { useState } from 'react'
-import { ethers } from 'ethers'
 import { Ring, RaceBy } from '@uiball/loaders'
-import QRCode from 'qrcode'
+import { useAccount, useSigner } from 'wagmi'
+import { useModal } from 'connectkit'
 import Modal from '../Modal'
+import QRCode from 'qrcode'
 import '../../styles/tailwind.css'
 
 export interface GeneratePassProps {
-  passName: string
-  ethpassApiKey: string
-  contractAddresses: string[]
-  chainId: number
+  passName?: string
+  ethpassApiKey?: string
+  contractAddresses?: string[]
+  chainId?: number
 }
 
 const GeneratePass: React.FC<GeneratePassProps> = ({
@@ -30,10 +31,19 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const [errorMessage, setErrorMessage] = useState('')
   const [modal, setModal] = useState('')
 
-  const validateHolder = async () => {
-    const provider = new ethers.providers.Web3Provider((window as any).ethereum)
-    const accounts = await provider.send('eth_requestAccounts', [])
+  const { address, isConnected } = useAccount()
+  const { data: signer } = useSigner()
+  const { setOpen } = useModal() // ConnectKit modal
 
+  const checkIsConnected = () => {
+    if (isConnected) {
+      validateHolder()
+    } else {
+      setOpen(true)
+    }
+  }
+
+  const validateHolder = async () => {
     setIsActive(true)
     setModal('Select NFT')
 
@@ -42,7 +52,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       chainId == 1
         ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
         : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-    const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${contractAddresses}`
+    const fetchURL = `${baseURL}?owner=${address}&contractAddresses%5B%5D=${contractAddresses}`
     const { ownedNfts } = await fetch(fetchURL).then((nfts) => nfts.json())
 
     setOwnedNfts(ownedNfts)
@@ -56,13 +66,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     setModal('Verifying')
 
     try {
-      const provider = new ethers.providers.Web3Provider((window as any).ethereum)
-      const accounts = await provider.send('eth_requestAccounts', [])
-
       const response = await fetch(
-        `https://api.ethpass.xyz/api/v0/passes?contractAddress=${contractAddress}&tokenId=${tokenId}&network=${chainId}&chain=${'evm'}&ownerAddress=${
-          accounts[0]
-        }&expired=${0}`,
+        `https://api.ethpass.xyz/api/v0/passes?contractAddress=${contractAddress}&tokenId=${tokenId}&network=${chainId}&chain=${'evm'}&ownerAddress=${address}&expired=${0}`,
         {
           method: 'GET',
           headers: new Headers({
@@ -77,6 +82,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
         if (pass.length) {
           getPassDistribution(pass[0])
+          setPlatform(pass[0].platform)
         } else {
           setModal('Select Platform')
         }
@@ -138,10 +144,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     let signature = ''
     let signatureMessage = ''
     try {
-      const provider = new ethers.providers.Web3Provider((window as any).ethereum)
-      const signer = provider.getSigner()
       signatureMessage = `Sign this message to generate a pass with ethpass. \n${Date.now()}`
-      signature = await signer.signMessage(signatureMessage)
+      signature = await signer?.signMessage(signatureMessage)
     } catch (error) {
       console.log(error)
       setModal('Select Platform')
@@ -269,7 +273,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     <>
       <button
         className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition duration-100 ease-in-out px-3 py-1.5"
-        onClick={validateHolder}
+        onClick={checkIsConnected}
       >
         Generate Pass
       </button>
@@ -334,16 +338,22 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         {modal === 'Select Platform' && (
           <div className="flex flex-col w-full gap-4">
             <button
-              className="bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4"
+              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
               onClick={() => generatePass('apple')}
             >
               Apple Wallet
+              <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
+                <img className="h-5" src="https://nwpass.vercel.app/img/apple-wallet.png" />
+              </div>
             </button>
             <button
-              className="bg-white text-gray-700 border rounded-xl hover:bg-gray-50 transition duration-100 ease-in-out px-4 py-4"
+              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
               onClick={() => generatePass('google')}
             >
               Google Wallet
+              <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
+                <img className="h-6" src="https://nwpass.vercel.app/img/google-wallet.png" />
+              </div>
             </button>
           </div>
         )}
@@ -386,20 +396,17 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                 Or tap below to download directly on your mobile device.
               </p>
               <a
-                className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
+                className="flex items-center justify-center"
                 href={fileUrl}
-                download
+                target="_blank"
+                rel="noreferrer"
               >
                 <img
-                  className="h-6"
-                  src={`https://nwpass.vercel.app/img/${
+                  className="h-12"
+                  src={`https://rtfkt.ethpass.xyz/assets/${
                     platform && platform.toLowerCase() === 'apple' ? 'apple' : 'google'
-                  }-wallet.png`}
+                  }-wallet-add.svg`}
                 />
-                <p>
-                  Add to {platform && platform.toLowerCase() === 'apple' ? 'Apple' : 'Google'}{' '}
-                  Wallet
-                </p>
               </a>
             </div>
           </div>
