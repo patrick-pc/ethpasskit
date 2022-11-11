@@ -14,6 +14,6 @@ export const Button = Template.bind({})
 Button.args = {
   passName: '',
   ethpassApiKey: '',
-  contractAddress: '',
+  contractAddresses: [],
   chainId: 1,
 }

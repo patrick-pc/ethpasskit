@@ -8,19 +8,22 @@ import '../../styles/tailwind.css'
 export interface GeneratePassProps {
   passName: string
   ethpassApiKey: string
-  contractAddress: string
+  contractAddresses: string[]
   chainId: number
 }
 
 const GeneratePass: React.FC<GeneratePassProps> = ({
   passName,
   ethpassApiKey,
-  contractAddress,
+  contractAddresses,
   chainId,
 }) => {
   const [isActive, setIsActive] = useState(false)
   const [ownedNfts, setOwnedNfts] = useState([])
-  const [tokenId, setTokenId] = useState(-1)
+  const [nft, setNft] = useState({
+    contractAddress: '',
+    tokenId: -1,
+  })
   const [platform, setPlatform] = useState('')
   const [fileUrl, setFileUrl] = useState('')
   const [qrCode, setQRCode] = useState('')
@@ -39,15 +42,92 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       chainId == 1
         ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
         : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-    const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${contractAddress}`
+    const fetchURL = `${baseURL}?owner=${accounts[0]}&contractAddresses%5B%5D=${contractAddresses}`
     const { ownedNfts } = await fetch(fetchURL).then((nfts) => nfts.json())
 
     setOwnedNfts(ownedNfts)
   }
 
-  const getTokenId = (tokenId: number) => {
-    setTokenId(tokenId)
-    setModal('Select Platform')
+  const checkExistingPass = async (contractAddress: string, tokenId: number) => {
+    setNft({
+      contractAddress,
+      tokenId,
+    })
+    setModal('Verifying')
+
+    try {
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum)
+      const accounts = await provider.send('eth_requestAccounts', [])
+
+      const response = await fetch(
+        `https://api.ethpass.xyz/api/v0/passes?contractAddress=${contractAddress}&tokenId=${tokenId}&network=${chainId}&chain=${'evm'}&ownerAddress=${
+          accounts[0]
+        }&expired=${0}`,
+        {
+          method: 'GET',
+          headers: new Headers({
+            'content-type': 'application/json',
+            'x-api-key': ethpassApiKey,
+          }),
+        }
+      )
+
+      if (response.status === 200) {
+        const pass = await response.json()
+
+        if (pass.length) {
+          getPassDistribution(pass[0])
+        } else {
+          setModal('Select Platform')
+        }
+      } else {
+        throw Error
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.log('## POST Error', error.message)
+        setErrorMessage(error.message)
+      } else {
+        console.log(`Unexpected error: ${error}`)
+        setErrorMessage(`Unexpected error: ${error}`)
+      }
+      setModal('Error')
+    }
+  }
+
+  const getPassDistribution = async (pass: any) => {
+    try {
+      const response = await fetch(`https://api.ethpass.xyz/api/v0/passes/${pass.id}/distribute`, {
+        method: 'GET',
+        headers: new Headers({
+          'content-type': 'application/json',
+          'x-api-key': ethpassApiKey,
+        }),
+      })
+
+      if (response.status === 200) {
+        const json = await response.json()
+        console.log('## POST Result', json)
+
+        setFileUrl(json.fileURL)
+        QRCode.toDataURL(json.fileURL, {}, (error, url) => {
+          if (error) throw error
+          setQRCode(url)
+        })
+        setModal('Pass Generated')
+      } else {
+        throw Error
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.log('## POST Error', error.message)
+        setErrorMessage(error.message)
+      } else {
+        console.log(`Unexpected error: ${error}`)
+        setErrorMessage(`Unexpected error: ${error}`)
+      }
+      setModal('Error')
+    }
   }
 
   const generatePass = async (platform: string) => {
@@ -92,13 +172,13 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
           {
             key: 'secondary1',
             label: 'Contract Address',
-            value: `${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`,
+            value: `${nft.contractAddress.slice(0, 6)}...${nft.contractAddress.slice(-4)}`,
             textAlignment: 'PKTextAlignmentLeft',
           },
           {
             key: 'secondary2',
             label: 'Token ID',
-            value: tokenId,
+            value: nft.tokenId,
             textAlignment: 'PKTextAlignmentLeft',
           },
           {
@@ -123,9 +203,12 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       signature,
       signatureMessage,
       platform: platform,
+      barcode: {
+        message: `NFT: ${nft.contractAddress}, Token ID: ${nft.tokenId}`,
+      },
       nft: {
-        contractAddress: contractAddress,
-        tokenId: tokenId,
+        contractAddress: nft.contractAddress,
+        tokenId: nft.tokenId,
       },
       chain: {
         name: 'evm',
@@ -204,28 +287,47 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                   ownedNfts.length === 1 ? 'justify-center w-full' : 'justify-start'
                 } gap-4`}
               >
-                {ownedNfts.map((nft: { id: { tokenId: string }; media: [{ gateway: string }] }) => {
-                  return (
-                    <button
-                      className="rounded-xl"
-                      onClick={() => getTokenId(parseInt(nft.id.tokenId))}
-                      key={parseInt(nft.id.tokenId)}
-                    >
-                      {nft.media[0].gateway.slice(-4) === '.mp4' ? (
-                        <video className="w-40 h-40 bg-black border rounded-xl" autoPlay loop muted>
-                          <source src={nft.media[0].gateway} type="video/mp4" />
-                        </video>
-                      ) : (
-                        <img
-                          className="w-40 h-40 bg-black border rounded-xl"
-                          src={nft.media[0].gateway}
-                        />
-                      )}
-                    </button>
-                  )
-                })}
+                {ownedNfts.map(
+                  (nft: {
+                    contract: { address: string }
+                    id: { tokenId: string }
+                    media: [{ gateway: string }]
+                  }) => {
+                    return (
+                      <button
+                        className="rounded-xl"
+                        onClick={() =>
+                          checkExistingPass(nft.contract.address, parseInt(nft.id.tokenId))
+                        }
+                        key={parseInt(nft.id.tokenId)}
+                      >
+                        {nft.media[0].gateway.slice(-4) === '.mp4' ? (
+                          <video
+                            className="w-40 h-40 bg-black border rounded-xl"
+                            autoPlay
+                            loop
+                            muted
+                          >
+                            <source src={nft.media[0].gateway} type="video/mp4" />
+                          </video>
+                        ) : (
+                          <img
+                            className="w-40 h-40 bg-black border rounded-xl"
+                            src={nft.media[0].gateway}
+                          />
+                        )}
+                      </button>
+                    )
+                  }
+                )}
               </div>
             )}
+          </div>
+        )}
+
+        {modal === 'Verifying' && (
+          <div className="flex flex-col items-center justify-center w-full gap-4">
+            <Ring size={60} color="#4F46E5" />
           </div>
         )}
 
