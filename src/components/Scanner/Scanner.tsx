@@ -35,6 +35,7 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [modal, setModal] = useState('')
+  const [nft, setNft] = useState(null)
 
   useEffect(() => {
     if (!videoRef.current) return
@@ -102,6 +103,13 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
 
       if (response.status === 200) {
         const json: ScanResult = await response.json()
+
+        if (json.nfts.length)
+          getNftMetadata(
+            json.nfts[0].contractAddress,
+            json.nfts[0].tokenId,
+            parseInt(json.chain.network)
+          )
         setScanResult(json)
         setModal('Pass Status')
       } else {
@@ -110,6 +118,27 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
     } catch (error) {
       setModal('Pass Invalid')
     }
+  }
+
+  const getNftMetadata = async (contractAddress: string, tokenId: string, chainId: number) => {
+    const baseURL =
+      chainId == 1
+        ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTMetadata'
+        : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTMetadata'
+    const fetchURL = `${baseURL}?contractAddress=${contractAddress}&tokenId=${tokenId}&refreshCache=false`
+    const nftMetadata = await fetch(fetchURL).then((nft) => nft.json())
+
+    setNft(nftMetadata)
+  }
+
+  const renderNft = () => {
+    if (!nft) return
+
+    return (
+      <div className="flex items-center justify-center mb-4">
+        <img className="h-40 w-40 rounded-xl" src={nft.media[0].gateway} />
+      </div>
+    )
   }
 
   const renderScanResult = () => {
@@ -271,6 +300,7 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
         {modal === 'Pass Status' && (
           <div className="flex flex-col items-center justify-center w-full gap-4">
             {renderScanResult()}
+            {renderNft()}
 
             <button
               className="w-full bg-zinc-200 hover:bg-zinc-300 text-zinc-500 rounded-lg transition duration-100 ease-in-out px-3 py-1.5"
