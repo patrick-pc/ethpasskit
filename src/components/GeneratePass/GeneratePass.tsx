@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Ring, RaceBy } from '@uiball/loaders'
 import { useAccount, useSigner } from 'wagmi'
 import { useModal } from 'connectkit'
@@ -6,18 +6,18 @@ import Modal from '../Modal'
 import QRCode from 'qrcode'
 import '../../styles/tailwind.css'
 
-export interface GeneratePassProps {
-  passName?: string
-  ethpassApiKey?: string
-  contractAddresses?: string[]
-  chainId?: number
+export type GeneratePassProps = {
+  settings: {
+    apiUrl: string
+    contractAddresses: string[]
+    chainId: number
+  }
+  className?: string
 }
 
 const GeneratePass: React.FC<GeneratePassProps> = ({
-  passName,
-  ethpassApiKey,
-  contractAddresses,
-  chainId,
+  settings: { apiUrl, contractAddresses, chainId },
+  className,
 }) => {
   const [isActive, setIsActive] = useState(false)
   const [ownedNfts, setOwnedNfts] = useState([])
@@ -34,6 +34,10 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const { address, isConnected } = useAccount()
   const { data: signer } = useSigner()
   const { setOpen } = useModal() // ConnectKit modal
+
+  useEffect(() => {
+    if (!address) return
+  }, [address])
 
   const checkIsConnected = () => {
     if (isConnected) {
@@ -58,7 +62,11 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     setOwnedNfts(ownedNfts)
   }
 
-  const checkExistingPass = async (contractAddress: string, tokenId: number) => {
+  const checkExistingPass = async (
+    contractAddress: string,
+    tokenId: number,
+    ownerAddress: string
+  ) => {
     setNft({
       contractAddress,
       tokenId,
@@ -67,22 +75,26 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
     try {
       const response = await fetch(
-        `https://api.ethpass.xyz/api/v0/passes?contractAddress=${contractAddress}&tokenId=${tokenId}&network=${chainId}&chain=${'evm'}&ownerAddress=${address}&expired=${0}`,
+        `${apiUrl}?contractAddress=${contractAddress}&tokenId=${tokenId}&chainId=${chainId}&ownerAddress=${ownerAddress}`,
         {
           method: 'GET',
           headers: new Headers({
             'content-type': 'application/json',
-            'x-api-key': ethpassApiKey,
           }),
         }
       )
 
       if (response.status === 200) {
-        const pass = await response.json()
+        const json = await response.json()
 
-        if (pass.length) {
-          getPassDistribution(pass[0])
-          setPlatform(pass[0].platform)
+        if (json?.fileURL) {
+          setFileUrl(json.fileURL)
+          QRCode.toDataURL(json.fileURL, {}, (error, url) => {
+            if (error) throw error
+            setQRCode(url)
+          })
+          setModal('Pass Generated')
+          setPlatform(json.platform)
         } else {
           setModal('Select Platform')
         }
@@ -91,45 +103,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       }
     } catch (error) {
       if (error instanceof Error) {
-        console.log('## POST Error', error.message)
         setErrorMessage(error.message)
       } else {
-        console.log(`Unexpected error: ${error}`)
-        setErrorMessage(`Unexpected error: ${error}`)
-      }
-      setModal('Error')
-    }
-  }
-
-  const getPassDistribution = async (pass: any) => {
-    try {
-      const response = await fetch(`https://api.ethpass.xyz/api/v0/passes/${pass.id}/distribute`, {
-        method: 'GET',
-        headers: new Headers({
-          'content-type': 'application/json',
-          'x-api-key': ethpassApiKey,
-        }),
-      })
-
-      if (response.status === 200) {
-        const json = await response.json()
-        console.log('## POST Result', json)
-
-        setFileUrl(json.fileURL)
-        QRCode.toDataURL(json.fileURL, {}, (error, url) => {
-          if (error) throw error
-          setQRCode(url)
-        })
-        setModal('Pass Generated')
-      } else {
-        throw Error
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        console.log('## POST Error', error.message)
-        setErrorMessage(error.message)
-      } else {
-        console.log(`Unexpected error: ${error}`)
         setErrorMessage(`Unexpected error: ${error}`)
       }
       setModal('Error')
@@ -147,7 +122,6 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       signatureMessage = `Sign this message to generate a pass with ethpass. \n${Date.now()}`
       signature = await signer?.signMessage(signatureMessage)
     } catch (error) {
-      console.log(error)
       setModal('Select Platform')
 
       return
@@ -155,79 +129,23 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
     setModal('Generating Pass')
 
-    // Pass details
-    let pass
-    if (platform === 'apple') {
-      pass = {
-        labelColor: 'rgb(70,70,220)',
-        backgroundColor: 'rgb(255,255,255)',
-        foregroundColor: 'rgb(0,0,0)',
-        description: passName,
-        headerFields: [],
-        primaryFields: [
-          {
-            key: 'primary1',
-            label: 'Pass',
-            value: passName,
-            textAlignment: 'PKTextAlignmentNatural',
-          },
-        ],
-        secondaryFields: [
-          {
-            key: 'secondary1',
-            label: 'Contract Address',
-            value: `${nft.contractAddress.slice(0, 6)}...${nft.contractAddress.slice(-4)}`,
-            textAlignment: 'PKTextAlignmentLeft',
-          },
-          {
-            key: 'secondary2',
-            label: 'Token ID',
-            value: nft.tokenId,
-            textAlignment: 'PKTextAlignmentLeft',
-          },
-          {
-            key: 'secondary3',
-            label: 'Chain ID',
-            value: chainId,
-            textAlignment: 'PKTextAlignmentLeft',
-          },
-        ],
-        auxiliaryFields: [],
-        backFields: [],
-      }
-    } else {
-      pass = {
-        messages: [],
-      }
-    }
-
     // Request body
     const payload = {
-      pass,
+      contractAddress: nft.contractAddress,
+      tokenId: nft.tokenId,
+      chainId: chainId,
+      platform: platform,
       signature,
       signatureMessage,
-      platform: platform,
-      barcode: {
-        message: `NFT: ${nft.contractAddress}, Token ID: ${nft.tokenId}`,
-      },
-      nft: {
-        contractAddress: nft.contractAddress,
-        tokenId: nft.tokenId,
-      },
-      chain: {
-        name: 'evm',
-        network: chainId,
-      },
     }
 
     // Send request
     try {
-      const response = await fetch('https://api.ethpass.xyz/api/v0/passes', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         body: JSON.stringify(payload),
         headers: new Headers({
           'content-type': 'application/json',
-          'X-API-KEY': ethpassApiKey,
         }),
       })
 
@@ -236,33 +154,27 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         setFileUrl(json.fileURL)
         setModal('Pass Generated')
 
-        console.log('## POST Result', json)
         QRCode.toDataURL(json.fileURL, {}, (error, url) => {
           if (error) throw error
           setQRCode(url)
         })
         setModal('Pass Generated')
       } else if (response.status === 401) {
-        console.log(`Unable to verify ownership: ${response.statusText}`)
         setErrorMessage(`Unable to verify ownership: ${response.statusText}`)
         setModal('Error')
       } else {
         try {
           const { error, message } = await response.json()
-          console.log(error || message)
           setErrorMessage(error || message)
         } catch {
-          console.log(`${response.status}: ${response.statusText}`)
           setErrorMessage(`${response.status}: ${response.statusText}`)
         }
         setModal('Error')
       }
     } catch (error) {
       if (error instanceof Error) {
-        console.log('## POST Error', error.message)
         setErrorMessage(error.message)
       } else {
-        console.log(`Unexpected error: ${error}`)
         setErrorMessage(`Unexpected error: ${error}`)
       }
       setModal('Error')
@@ -272,7 +184,11 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   return (
     <>
       <button
-        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition duration-100 ease-in-out px-3 py-1.5"
+        className={
+          className
+            ? className
+            : 'bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition duration-100 ease-in-out px-3 py-1.5'
+        }
         onClick={checkIsConnected}
       >
         Generate Pass
@@ -301,7 +217,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                       <button
                         className="rounded-xl"
                         onClick={() =>
-                          checkExistingPass(nft.contract.address, parseInt(nft.id.tokenId))
+                          checkExistingPass(nft.contract.address, parseInt(nft.id.tokenId), address)
                         }
                         key={parseInt(nft.id.tokenId)}
                       >
@@ -338,7 +254,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         {modal === 'Select Platform' && (
           <div className="flex flex-col w-full gap-4">
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
+              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
               onClick={() => generatePass('apple')}
             >
               Apple Wallet
@@ -347,7 +263,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
               </div>
             </button>
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out px-4 py-4 gap-2"
+              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
               onClick={() => generatePass('google')}
             >
               Google Wallet
@@ -403,7 +319,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
               >
                 <img
                   className="h-12"
-                  src={`https://rtfkt.ethpass.xyz/assets/${
+                  src={`https://nwpass.vercel.app/img/${
                     platform && platform.toLowerCase() === 'apple' ? 'apple' : 'google'
                   }-wallet-add.svg`}
                 />

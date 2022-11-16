@@ -1,7 +1,7 @@
 import React from 'react'
 import { ConnectKitProvider, getDefaultClient } from 'connectkit'
 import { createClient, WagmiConfig } from 'wagmi'
-import GeneratePassButton from './GeneratePass/GeneratePass'
+import GeneratePassButton from './GeneratePass'
 
 const client = createClient(
   getDefaultClient({
@@ -10,16 +10,11 @@ const client = createClient(
   })
 )
 
-export const GeneratePass = ({ passName, ethpassApiKey, contractAddresses, chainId }) => {
+export const GeneratePass = ({ settings, className }) => {
   return (
     <WagmiConfig client={client}>
       <ConnectKitProvider theme="soft">
-        <GeneratePassButton
-          passName={passName}
-          ethpassApiKey={ethpassApiKey}
-          contractAddresses={contractAddresses}
-          chainId={chainId}
-        />
+        <GeneratePassButton settings={settings} className={className} />
       </ConnectKitProvider>
     </WagmiConfig>
   )

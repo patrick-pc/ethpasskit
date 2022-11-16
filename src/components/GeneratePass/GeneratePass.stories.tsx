@@ -12,8 +12,10 @@ const Template: ComponentStory<typeof GeneratePass> = (args) => <GeneratePass {.
 
 export const Button = Template.bind({})
 Button.args = {
-  passName: '',
-  ethpassApiKey: '',
-  contractAddresses: [],
-  chainId: 1,
+  settings: {
+    apiUrl: '',
+    passName: '',
+    contractAddresses: [],
+    chainId: 1,
+  },
 }
