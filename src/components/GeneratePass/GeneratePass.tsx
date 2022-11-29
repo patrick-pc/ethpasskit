@@ -20,6 +20,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   className,
 }) => {
   const [isActive, setIsActive] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [ownedNfts, setOwnedNfts] = useState([])
   const [nft, setNft] = useState({
     contractAddress: '',
@@ -51,15 +52,57 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     setIsActive(true)
     setModal('Select NFT')
 
-    // Get owned NFTs
-    const baseURL =
-      chainId == 1
-        ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-        : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-    const fetchURL = `${baseURL}?owner=${address}&contractAddresses%5B%5D=${contractAddresses}`
-    const { ownedNfts } = await fetch(fetchURL).then((nfts) => nfts.json())
+    setIsLoading(true)
+    try {
+      // const collection = await fetch(
+      //   `http://localhost:3001/api/public/assets?address=${address}&contractAddresses=${contractAddresses}`,
+      //   {
+      //     method: 'GET',
+      //     mode: 'no-cors',
+      //     headers: new Headers({
+      //       'content-type': 'application/json',
+      //     }),
+      //   }
+      // )
+      // const test = await collection.json()
+      // console.log(collection)
 
-    setOwnedNfts(ownedNfts)
+      const collection = await fetch(
+        `https:///www.ethpass.xyz/api/public/assets?address=${address}`,
+        {
+          method: 'GET',
+          mode: 'no-cors',
+          headers: new Headers({
+            'content-type': 'application/json',
+          }),
+        }
+      ).then((nfts) => nfts.json())
+      console.log(collection)
+
+      // const { nfts } = await fetch(
+      //   `https://api.simplehash.com/api/v0/nfts/owners?chains=polygon,ethereum&wallet_addresses=${address}&contract_addresses=${contractAddresses}`,
+      //   {
+      //     method: 'GET',
+      //     headers: new Headers({
+      //       'content-type': 'application/json',
+      //       'x-api-key': '',
+      //     }),
+      //   }
+      // ).then((nfts) => nfts.json())
+
+      // console.log(nfts)
+
+      // setOwnedNfts(nfts)
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage(`Unexpected error: ${error}`)
+      }
+      setModal('Error')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const checkExistingPass = async (
@@ -196,8 +239,12 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
       <Modal title={modal} isActive={isActive} onClose={() => setIsActive(false)}>
         {modal === 'Select NFT' && (
-          <div className="flex overflow-x-auto w-full">
-            {ownedNfts.length === 0 ? (
+          <div className="flex overflow-x-auto overflow-y-hidden w-full">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center w-full">
+                <Ring size={60} color="#4F46E5" />
+              </div>
+            ) : ownedNfts.length === 0 ? (
               <span className="flex items-center justify-center text-sm opacity-50 w-full">
                 Oops! Looks like you have no eligible NFTs.
               </span>
@@ -209,32 +256,55 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
               >
                 {ownedNfts.map(
                   (nft: {
-                    contract: { address: string }
-                    id: { tokenId: string }
-                    media: [{ gateway: string }]
+                    contract_address: string
+                    token_id: string
+                    image_url: string
+                    video_url: string
                   }) => {
                     return (
                       <button
                         className="rounded-xl"
                         onClick={() =>
-                          checkExistingPass(nft.contract.address, parseInt(nft.id.tokenId), address)
+                          checkExistingPass(nft.contract_address, parseInt(nft.token_id), address)
                         }
-                        key={parseInt(nft.id.tokenId)}
+                        key={parseInt(nft.token_id)}
                       >
-                        {nft.media[0].gateway.slice(-4) === '.mp4' ? (
-                          <video
-                            className="w-40 h-40 bg-black border rounded-xl"
-                            autoPlay
-                            loop
-                            muted
-                          >
-                            <source src={nft.media[0].gateway} type="video/mp4" />
-                          </video>
+                        {nft.video_url ? (
+                          <div className="relative">
+                            <video
+                              className="w-40 h-40 bg-black border rounded-xl"
+                              autoPlay
+                              loop
+                              muted
+                            >
+                              <source src={nft.video_url} type="video/mp4" />
+                            </video>
+                            <div
+                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
+                              style={{
+                                background:
+                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
+                              }}
+                            >
+                              #{nft.token_id}
+                            </div>
+                          </div>
                         ) : (
-                          <img
-                            className="w-40 h-40 bg-black border rounded-xl"
-                            src={nft.media[0].gateway}
-                          />
+                          <div className="relative">
+                            <img
+                              className="w-40 h-40 bg-black border rounded-xl"
+                              src={nft.image_url}
+                            />
+                            <div
+                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
+                              style={{
+                                background:
+                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
+                              }}
+                            >
+                              #{nft.token_id}
+                            </div>
+                          </div>
                         )}
                       </button>
                     )

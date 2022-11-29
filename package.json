@@ -1,6 +1,6 @@
 {
   "name": "@web3slinger/ethpasskit",
-  "version": "0.5.1",
+  "version": "0.5.5",
   "description": "An ethpass component library.",
   "scripts": {
     "rollup": "rollup -c",
@@ -46,7 +46,7 @@
     "@headlessui/react": "^1.7.3",
     "@uiball/loaders": "^1.2.6",
     "autoprefixer": "^10.4.12",
-    "connectkit": "^1.0.0",
+    "connectkit": "^0.0.2",
     "ethers": "^5.7.1",
     "qr-scanner": "^1.4.1",
     "qrcode": "^1.5.1",
