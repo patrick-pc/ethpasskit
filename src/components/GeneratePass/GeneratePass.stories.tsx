@@ -17,7 +17,7 @@ Button.args = {
     passName: 'Test',
     contractAddresses: [
       '0xcd041f40d497038e2da65988b7d7e2c0d9244619',
-      '0x60576a64851c5b42e8c57e3e4a5cf3cf4eeb2ed6',
+      '0xefb4f583b2b6f0e8c658dd7675e356d8a30ac7ff',
     ],
     chainId: 1,
   },

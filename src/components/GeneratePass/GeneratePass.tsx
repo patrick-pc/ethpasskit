@@ -31,6 +31,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const [qrCode, setQRCode] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [modal, setModal] = useState('')
+  const [connectAttempt, setConnectAttempt] = useState(false)
 
   const { address, isConnected } = useAccount()
   const { data: signer } = useSigner()
@@ -40,11 +41,19 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     if (!address) return
   }, [address])
 
+  useEffect(() => {
+    if (isConnected && connectAttempt) {
+      validateHolder()
+      setConnectAttempt(false)
+    }
+  }, [isConnected])
+
   const checkIsConnected = () => {
     if (isConnected) {
       validateHolder()
     } else {
       setOpen(true)
+      setConnectAttempt(true)
     }
   }
 
@@ -54,45 +63,22 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
     setIsLoading(true)
     try {
-      // const collection = await fetch(
-      //   `http://localhost:3001/api/public/assets?address=${address}&contractAddresses=${contractAddresses}`,
-      //   {
-      //     method: 'GET',
-      //     mode: 'no-cors',
-      //     headers: new Headers({
-      //       'content-type': 'application/json',
-      //     }),
-      //   }
-      // )
-      // const test = await collection.json()
-      // console.log(collection)
-
-      const collection = await fetch(
-        `https:///www.ethpass.xyz/api/public/assets?address=${address}`,
+      const { collection } = await fetch(
+        `https:///www.ethpass.xyz/api/public/assets?address=${address}&contractAddresses=${contractAddresses}`,
         {
           method: 'GET',
-          mode: 'no-cors',
           headers: new Headers({
             'content-type': 'application/json',
           }),
         }
       ).then((nfts) => nfts.json())
-      console.log(collection)
 
-      // const { nfts } = await fetch(
-      //   `https://api.simplehash.com/api/v0/nfts/owners?chains=polygon,ethereum&wallet_addresses=${address}&contract_addresses=${contractAddresses}`,
-      //   {
-      //     method: 'GET',
-      //     headers: new Headers({
-      //       'content-type': 'application/json',
-      //       'x-api-key': '',
-      //     }),
-      //   }
-      // ).then((nfts) => nfts.json())
+      const nfts = []
+      Object.keys(collection).forEach((key) => {
+        nfts.push(collection[key])
+      })
 
-      // console.log(nfts)
-
-      // setOwnedNfts(nfts)
+      setOwnedNfts(nfts.flat(1))
     } catch (error) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
@@ -256,20 +242,24 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
               >
                 {ownedNfts.map(
                   (nft: {
-                    contract_address: string
+                    asset_contract: { address: string }
                     token_id: string
                     image_url: string
-                    video_url: string
+                    animation_url: string
                   }) => {
                     return (
                       <button
                         className="rounded-xl"
                         onClick={() =>
-                          checkExistingPass(nft.contract_address, parseInt(nft.token_id), address)
+                          checkExistingPass(
+                            nft.asset_contract.address,
+                            parseInt(nft.token_id),
+                            address
+                          )
                         }
                         key={parseInt(nft.token_id)}
                       >
-                        {nft.video_url ? (
+                        {nft.animation_url ? (
                           <div className="relative">
                             <video
                               className="w-40 h-40 bg-black border rounded-xl"
@@ -277,7 +267,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                               loop
                               muted
                             >
-                              <source src={nft.video_url} type="video/mp4" />
+                              <source src={nft.animation_url} type="video/mp4" />
                             </video>
                             <div
                               className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
