@@ -25,11 +25,13 @@ export type ScanResult = {
   }
 }
 
-export interface ScannerProps {
-  ethpassApiKey: string
+export type ScannerProps = {
+  settings: {
+    apiUrl: string
+  }
 }
 
-const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
+const Scanner: React.FC<ScannerProps> = ({ settings: { apiUrl } }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const scannerRef = useRef<QrScanner | null>(null)
   const [scanResult, setScanResult] = useState<ScanResult | null>(null)
@@ -76,28 +78,27 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
 
   const start = () => {
     if (!scannerRef.current) return
+
+    scannerRef.current.stop()
     scannerRef.current.start()
   }
 
   const reset = () => {
+    setScanResult(null)
     setIsActive(false)
-    setTimeout(() => {
-      setModal('')
-      setScanResult(null)
-      start()
-    }, 300) // Transition animation duration
+    setModal('')
+    start()
   }
 
-  const scanPass = async (barcode: string) => {
+  const scanPass = async (data: string) => {
     setIsActive(true)
     setModal('Verifying')
 
     try {
-      const response = await fetch(`https://api.ethpass.xyz/api/v0/scan?data=${barcode}`, {
+      const response = await fetch(`${apiUrl}?data=${data}`, {
         method: 'GET',
         headers: new Headers({
           'content-type': 'application/json',
-          'x-api-key': ethpassApiKey,
         }),
       })
 
@@ -123,8 +124,8 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
   const getNftMetadata = async (contractAddress: string, tokenId: string, chainId: number) => {
     const baseURL =
       chainId == 1
-        ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTMetadata'
-        : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTMetadata'
+        ? 'https://eth-mainnet.g.alchemy.com/nft/v2/LlSnxPm7PUKykMfIwJUYnsMUoV9Cc7dX/getNFTMetadata'
+        : 'https://polygon-mainnet.g.alchemy.com/nft/v2/LlSnxPm7PUKykMfIwJUYnsMUoV9Cc7dX/getNFTMetadata'
     const fetchURL = `${baseURL}?contractAddress=${contractAddress}&tokenId=${tokenId}&refreshCache=false`
     const nftMetadata = await fetch(fetchURL).then((nft) => nft.json())
 
@@ -272,7 +273,11 @@ const Scanner: React.FC<ScannerProps> = ({ ethpassApiKey }) => {
   return (
     <>
       <div className="flex flex-col max-w-xs gap-4">
-        <video className="h-80 w-full border rounded-xl object-cover" ref={videoRef} muted />
+        <video
+          className="h-80 w-full border border-zinc-300 rounded-xl object-cover"
+          ref={videoRef}
+          muted
+        />
 
         <div className="flex justify-between gap-4">
           <button

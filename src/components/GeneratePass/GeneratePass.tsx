@@ -43,14 +43,14 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
   useEffect(() => {
     if (isConnected && connectAttempt) {
-      validateHolder()
+      checkExistingPass(contractAddresses[0], address)
       setConnectAttempt(false)
     }
   }, [isConnected])
 
   const checkIsConnected = () => {
     if (isConnected) {
-      validateHolder()
+      checkExistingPass(contractAddresses[0], address)
     } else {
       setOpen(true)
       setConnectAttempt(true)
@@ -93,13 +93,10 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
   const checkExistingPass = async (
     contractAddress: string,
-    tokenId: number,
-    ownerAddress: string
+    ownerAddress: string,
+    tokenId?: number
   ) => {
-    setNft({
-      contractAddress,
-      tokenId,
-    })
+    setIsActive(true)
     setModal('Verifying')
 
     try {
@@ -125,10 +122,11 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
           setModal('Pass Generated')
           setPlatform(json.platform)
         } else {
-          setModal('Select Platform')
+          validateHolder()
         }
       } else {
-        throw Error
+        setErrorMessage(`${response.status}: ${response.statusText}`)
+        setModal('Error')
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -181,7 +179,6 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       if (response.status === 200) {
         const json = await response.json()
         setFileUrl(json.fileURL)
-        setModal('Pass Generated')
 
         QRCode.toDataURL(json.fileURL, {}, (error, url) => {
           if (error) throw error
@@ -250,13 +247,13 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                     return (
                       <button
                         className="rounded-xl"
-                        onClick={() =>
-                          checkExistingPass(
-                            nft.asset_contract.address,
-                            parseInt(nft.token_id),
-                            address
-                          )
-                        }
+                        onClick={() => {
+                          setNft({
+                            contractAddress: nft.asset_contract.address,
+                            tokenId: parseInt(nft.token_id),
+                          })
+                          setModal('Select Platform')
+                        }}
                         key={parseInt(nft.token_id)}
                       >
                         {nft.animation_url ? (
