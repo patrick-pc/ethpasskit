@@ -32,6 +32,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const [errorMessage, setErrorMessage] = useState('')
   const [modal, setModal] = useState('')
   const [connectAttempt, setConnectAttempt] = useState(false)
+  const [disableClose, setDisableClose] = useState(false)
 
   const { address, isConnected } = useAccount()
   const { data: signer } = useSigner()
@@ -85,6 +86,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       } else {
         setErrorMessage(`Unexpected error: ${error}`)
       }
+      setIsActive(true)
+      setDisableClose(false)
       setModal('Error')
     } finally {
       setIsLoading(false)
@@ -119,6 +122,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
             if (error) throw error
             setQRCode(url)
           })
+          setIsActive(true)
           setModal('Pass Generated')
           setPlatform(json.platform)
         } else {
@@ -126,6 +130,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         }
       } else {
         setErrorMessage(`${response.status}: ${response.statusText}`)
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Error')
       }
     } catch (error) {
@@ -134,12 +140,15 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       } else {
         setErrorMessage(`Unexpected error: ${error}`)
       }
+      setIsActive(true)
+      setDisableClose(false)
       setModal('Error')
     }
   }
 
   const generatePass = async (platform: string) => {
     setPlatform(platform)
+    setIsActive(true)
     setModal('Signature Request')
 
     // Get signature
@@ -149,11 +158,14 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       signatureMessage = `Sign this message to generate a pass with ethpass. \n${Date.now()}`
       signature = await signer?.signMessage(signatureMessage)
     } catch (error) {
+      setIsActive(true)
       setModal('Select Platform')
 
       return
     }
 
+    setIsActive(true)
+    setDisableClose(true)
     setModal('Generating Pass')
 
     // Request body
@@ -184,9 +196,13 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
           if (error) throw error
           setQRCode(url)
         })
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Pass Generated')
       } else if (response.status === 401) {
         setErrorMessage(`Unable to verify ownership: ${response.statusText}`)
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Error')
       } else {
         try {
@@ -195,6 +211,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         } catch {
           setErrorMessage(`${response.status}: ${response.statusText}`)
         }
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Error')
       }
     } catch (error) {
@@ -203,6 +221,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       } else {
         setErrorMessage(`Unexpected error: ${error}`)
       }
+      setIsActive(true)
+      setDisableClose(false)
       setModal('Error')
     }
   }
@@ -220,7 +240,12 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         Generate Pass
       </button>
 
-      <Modal title={modal} isActive={isActive} onClose={() => setIsActive(false)}>
+      <Modal
+        title={modal}
+        isActive={isActive}
+        onClose={() => setIsActive(false)}
+        disableClose={disableClose}
+      >
         {modal === 'Select NFT' && (
           <div className="flex overflow-x-auto overflow-y-hidden w-full">
             {isLoading ? (
@@ -311,22 +336,22 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         {modal === 'Select Platform' && (
           <div className="flex flex-col w-full gap-4">
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
+              className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-3 gap-4"
               onClick={() => generatePass('apple')}
             >
-              Apple Wallet
               <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
                 <img className="h-5" src="https://nwpass.vercel.app/img/apple-wallet.png" />
               </div>
+              <div className="w-[105px] text-left">Apple Wallet</div>
             </button>
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
+              className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-3 gap-4"
               onClick={() => generatePass('google')}
             >
-              Google Wallet
               <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
                 <img className="h-6" src="https://nwpass.vercel.app/img/google-wallet.png" />
               </div>
+              <div className="w-[105px] text-left">Google Wallet</div>
             </button>
           </div>
         )}
