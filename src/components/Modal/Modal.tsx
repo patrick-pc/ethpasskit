@@ -6,12 +6,19 @@ export interface ModalProps {
   title: string
   isActive: boolean
   onClose: () => void
+  disableClose?: boolean
 }
 
-const Modal = ({ children, title, isActive, onClose }: ModalProps) => {
+const Modal = ({ children, title, isActive, onClose, disableClose = false }: ModalProps) => {
   return (
     <Transition.Root show={isActive} as={Fragment}>
-      <Dialog as="div" className="fixed inset-0 overflow-y-auto z-50" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="fixed inset-0 overflow-y-auto z-50"
+        onClose={() => {
+          disableClose ? null : onClose()
+        }}
+      >
         <div className="flex items-end sm:items-center justify-center h-screen w-screen">
           {/* Overlay */}
           <Transition.Child
@@ -56,7 +63,9 @@ const Modal = ({ children, title, isActive, onClose }: ModalProps) => {
                 </button>
                 <div className="text-lg font-medium">{title}</div>
                 <button
-                  className="opacity-50 hover:opacity-100 hover:text-indigo-600 transition duration-300 ease-in-out"
+                  className={`opacity-50 hover:opacity-100 hover:text-indigo-600 transition duration-300 ease-in-out ${
+                    disableClose ? 'invisible' : 'visible'
+                  }`}
                   onClick={onClose}
                 >
                   <svg

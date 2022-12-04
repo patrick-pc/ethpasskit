@@ -20,6 +20,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   className,
 }) => {
   const [isActive, setIsActive] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [ownedNfts, setOwnedNfts] = useState([])
   const [nft, setNft] = useState({
     contractAddress: '',
@@ -30,6 +31,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const [qrCode, setQRCode] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [modal, setModal] = useState('')
+  const [connectAttempt, setConnectAttempt] = useState(false)
+  const [disableClose, setDisableClose] = useState(false)
 
   const { address, isConnected } = useAccount()
   const { data: signer } = useSigner()
@@ -39,11 +42,19 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     if (!address) return
   }, [address])
 
+  useEffect(() => {
+    if (isConnected && connectAttempt) {
+      checkExistingPass(contractAddresses[0], address)
+      setConnectAttempt(false)
+    }
+  }, [isConnected])
+
   const checkIsConnected = () => {
     if (isConnected) {
-      validateHolder()
+      checkExistingPass(contractAddresses[0], address)
     } else {
       setOpen(true)
+      setConnectAttempt(true)
     }
   }
 
@@ -51,26 +62,44 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     setIsActive(true)
     setModal('Select NFT')
 
-    // Get owned NFTs
-    const baseURL =
-      chainId == 1
-        ? 'https://eth-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-        : 'https://polygon-mainnet.g.alchemy.com/nft/v2/demo/getNFTs'
-    const fetchURL = `${baseURL}?owner=${address}&contractAddresses%5B%5D=${contractAddresses}`
-    const { ownedNfts } = await fetch(fetchURL).then((nfts) => nfts.json())
+    setIsLoading(true)
+    try {
+      const { collection } = await fetch(
+        `https:///www.ethpass.xyz/api/public/assets?address=${address}&contractAddresses=${contractAddresses}`,
+        {
+          method: 'GET',
+          headers: new Headers({
+            'content-type': 'application/json',
+          }),
+        }
+      ).then((nfts) => nfts.json())
 
-    setOwnedNfts(ownedNfts)
+      const nfts = []
+      Object.keys(collection).forEach((key) => {
+        nfts.push(collection[key])
+      })
+
+      setOwnedNfts(nfts.flat(1))
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message)
+      } else {
+        setErrorMessage(`Unexpected error: ${error}`)
+      }
+      setIsActive(true)
+      setDisableClose(false)
+      setModal('Error')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const checkExistingPass = async (
     contractAddress: string,
-    tokenId: number,
-    ownerAddress: string
+    ownerAddress: string,
+    tokenId?: number
   ) => {
-    setNft({
-      contractAddress,
-      tokenId,
-    })
+    setIsActive(true)
     setModal('Verifying')
 
     try {
@@ -93,13 +122,17 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
             if (error) throw error
             setQRCode(url)
           })
+          setIsActive(true)
           setModal('Pass Generated')
           setPlatform(json.platform)
         } else {
-          setModal('Select Platform')
+          validateHolder()
         }
       } else {
-        throw Error
+        setErrorMessage(`${response.status}: ${response.statusText}`)
+        setIsActive(true)
+        setDisableClose(false)
+        setModal('Error')
       }
     } catch (error) {
       if (error instanceof Error) {
@@ -107,12 +140,15 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       } else {
         setErrorMessage(`Unexpected error: ${error}`)
       }
+      setIsActive(true)
+      setDisableClose(false)
       setModal('Error')
     }
   }
 
   const generatePass = async (platform: string) => {
     setPlatform(platform)
+    setIsActive(true)
     setModal('Signature Request')
 
     // Get signature
@@ -122,11 +158,14 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       signatureMessage = `Sign this message to generate a pass with ethpass. \n${Date.now()}`
       signature = await signer?.signMessage(signatureMessage)
     } catch (error) {
+      setIsActive(true)
       setModal('Select Platform')
 
       return
     }
 
+    setIsActive(true)
+    setDisableClose(true)
     setModal('Generating Pass')
 
     // Request body
@@ -152,15 +191,18 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       if (response.status === 200) {
         const json = await response.json()
         setFileUrl(json.fileURL)
-        setModal('Pass Generated')
 
         QRCode.toDataURL(json.fileURL, {}, (error, url) => {
           if (error) throw error
           setQRCode(url)
         })
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Pass Generated')
       } else if (response.status === 401) {
         setErrorMessage(`Unable to verify ownership: ${response.statusText}`)
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Error')
       } else {
         try {
@@ -169,6 +211,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         } catch {
           setErrorMessage(`${response.status}: ${response.statusText}`)
         }
+        setIsActive(true)
+        setDisableClose(false)
         setModal('Error')
       }
     } catch (error) {
@@ -177,6 +221,8 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
       } else {
         setErrorMessage(`Unexpected error: ${error}`)
       }
+      setIsActive(true)
+      setDisableClose(false)
       setModal('Error')
     }
   }
@@ -194,10 +240,19 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         Generate Pass
       </button>
 
-      <Modal title={modal} isActive={isActive} onClose={() => setIsActive(false)}>
+      <Modal
+        title={modal}
+        isActive={isActive}
+        onClose={() => setIsActive(false)}
+        disableClose={disableClose}
+      >
         {modal === 'Select NFT' && (
-          <div className="flex overflow-x-auto w-full">
-            {ownedNfts.length === 0 ? (
+          <div className="flex overflow-x-auto overflow-y-hidden w-full">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center w-full">
+                <Ring size={60} color="#4F46E5" />
+              </div>
+            ) : ownedNfts.length === 0 ? (
               <span className="flex items-center justify-center text-sm opacity-50 w-full">
                 Oops! Looks like you have no eligible NFTs.
               </span>
@@ -209,32 +264,59 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
               >
                 {ownedNfts.map(
                   (nft: {
-                    contract: { address: string }
-                    id: { tokenId: string }
-                    media: [{ gateway: string }]
+                    asset_contract: { address: string }
+                    token_id: string
+                    image_url: string
+                    animation_url: string
                   }) => {
                     return (
                       <button
                         className="rounded-xl"
-                        onClick={() =>
-                          checkExistingPass(nft.contract.address, parseInt(nft.id.tokenId), address)
-                        }
-                        key={parseInt(nft.id.tokenId)}
+                        onClick={() => {
+                          setNft({
+                            contractAddress: nft.asset_contract.address,
+                            tokenId: parseInt(nft.token_id),
+                          })
+                          setModal('Select Platform')
+                        }}
+                        key={parseInt(nft.token_id)}
                       >
-                        {nft.media[0].gateway.slice(-4) === '.mp4' ? (
-                          <video
-                            className="w-40 h-40 bg-black border rounded-xl"
-                            autoPlay
-                            loop
-                            muted
-                          >
-                            <source src={nft.media[0].gateway} type="video/mp4" />
-                          </video>
+                        {nft.animation_url ? (
+                          <div className="relative">
+                            <video
+                              className="w-40 h-40 bg-black border rounded-xl"
+                              autoPlay
+                              loop
+                              muted
+                            >
+                              <source src={nft.animation_url} type="video/mp4" />
+                            </video>
+                            <div
+                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
+                              style={{
+                                background:
+                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
+                              }}
+                            >
+                              #{nft.token_id}
+                            </div>
+                          </div>
                         ) : (
-                          <img
-                            className="w-40 h-40 bg-black border rounded-xl"
-                            src={nft.media[0].gateway}
-                          />
+                          <div className="relative">
+                            <img
+                              className="w-40 h-40 bg-black border rounded-xl"
+                              src={nft.image_url}
+                            />
+                            <div
+                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
+                              style={{
+                                background:
+                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
+                              }}
+                            >
+                              #{nft.token_id}
+                            </div>
+                          </div>
                         )}
                       </button>
                     )
@@ -254,22 +336,22 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         {modal === 'Select Platform' && (
           <div className="flex flex-col w-full gap-4">
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
+              className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-3 gap-4"
               onClick={() => generatePass('apple')}
             >
-              Apple Wallet
               <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
                 <img className="h-5" src="https://nwpass.vercel.app/img/apple-wallet.png" />
               </div>
+              <div className="w-[105px] text-left">Apple Wallet</div>
             </button>
             <button
-              className="flex items-center justify-between bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-4 gap-2"
+              className="flex items-center justify-center bg-white hover:bg-gray-50 text-gray-700 border rounded-xl cursor-pointer select-none transition duration-100 ease-in-out p-3 gap-4"
               onClick={() => generatePass('google')}
             >
-              Google Wallet
               <div className="flex items-center justify-center bg-zinc-100 rounded-lg h-10 w-10">
                 <img className="h-6" src="https://nwpass.vercel.app/img/google-wallet.png" />
               </div>
+              <div className="w-[105px] text-left">Google Wallet</div>
             </button>
           </div>
         )}

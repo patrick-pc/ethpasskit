@@ -12,5 +12,7 @@ const Template: ComponentStory<typeof Scanner> = (args) => <Scanner {...args} />
 
 export const BarcodeScanner = Template.bind({})
 BarcodeScanner.args = {
-  ethpassApiKey: '',
+  settings: {
+    apiKey: '',
+  },
 }
