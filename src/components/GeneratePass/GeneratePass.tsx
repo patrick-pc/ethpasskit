@@ -9,14 +9,22 @@ import '../../styles/tailwind.css'
 export type GeneratePassProps = {
   settings: {
     apiUrl: string
-    contractAddresses: string[]
-    chainId: number
+    contracts: [
+      {
+        chain: {
+          name: string
+          network: number
+        }
+        address: string
+        slug?: string
+      }
+    ]
   }
   className?: string
 }
 
 const GeneratePass: React.FC<GeneratePassProps> = ({
-  settings: { apiUrl, contractAddresses, chainId },
+  settings: { apiUrl, contracts },
   className,
 }) => {
   const [isActive, setIsActive] = useState(false)
@@ -24,7 +32,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   const [ownedNfts, setOwnedNfts] = useState([])
   const [nft, setNft] = useState({
     contractAddress: '',
-    tokenId: -1,
+    tokenId: '',
   })
   const [platform, setPlatform] = useState('')
   const [fileUrl, setFileUrl] = useState('')
@@ -44,14 +52,14 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
   useEffect(() => {
     if (isConnected && connectAttempt) {
-      checkExistingPass(contractAddresses[0], address)
+      validateHolder()
       setConnectAttempt(false)
     }
   }, [isConnected])
 
   const checkIsConnected = () => {
     if (isConnected) {
-      checkExistingPass(contractAddresses[0], address)
+      validateHolder()
     } else {
       setOpen(true)
       setConnectAttempt(true)
@@ -64,6 +72,13 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
 
     setIsLoading(true)
     try {
+      // Get contract addresses from user input
+      const contractAddresses = []
+      contracts.map((contract) => {
+        contractAddresses.push(contract.address)
+      })
+
+      // Get collections
       const { collection } = await fetch(
         `https:///www.ethpass.xyz/api/public/assets?address=${address}&contractAddresses=${contractAddresses}`,
         {
@@ -74,12 +89,46 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
         }
       ).then((nfts) => nfts.json())
 
+      // Merge collections from object to a single array
       const nfts = []
       Object.keys(collection).forEach((key) => {
         nfts.push(collection[key])
       })
+      let ownedNfts = nfts.flat(1)
 
-      setOwnedNfts(nfts.flat(1))
+      // Check if OS storefront contract address and slug is equal from user input
+      const osCollections = []
+      const OS_STOREFRONT_ADDRESS = '0x495f947276749ce646f68ac8c248420045cb7b5e'
+      for (let i = 0; i < ownedNfts.length; i++) {
+        const nft = ownedNfts[i]
+        if (nft.asset_contract.address.toLowerCase() === OS_STOREFRONT_ADDRESS.toLowerCase()) {
+          contracts.map((contract) => {
+            if (
+              contract.slug &&
+              contract.slug.toLowerCase() === nft.collection.slug.toLowerCase()
+            ) {
+              osCollections.push(nft)
+            }
+          })
+        }
+      }
+
+      // Remove OS storefront contract addresses from main array and merge osCollections
+      ownedNfts?.map((nft, i) => {
+        if (nft.asset_contract.address.toLowerCase() === OS_STOREFRONT_ADDRESS.toLowerCase()) {
+          ownedNfts.splice(i, 1)
+        }
+      })
+      for (let i = 0; i < ownedNfts.length; i++) {
+        const nft = ownedNfts[i]
+        if (nft.asset_contract.address.toLowerCase() === OS_STOREFRONT_ADDRESS.toLowerCase()) {
+          ownedNfts.splice(i, 1)
+          i--
+        }
+      }
+      ownedNfts = ownedNfts.concat(osCollections)
+
+      setOwnedNfts(ownedNfts)
     } catch (error) {
       if (error instanceof Error) {
         setErrorMessage(error.message)
@@ -95,16 +144,20 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
   }
 
   const checkExistingPass = async (
-    contractAddress: string,
     ownerAddress: string,
-    tokenId?: number
+    contractAddress: string,
+    tokenId?: string
   ) => {
+    setNft({
+      contractAddress,
+      tokenId,
+    })
     setIsActive(true)
     setModal('Verifying')
 
     try {
       const response = await fetch(
-        `${apiUrl}?contractAddress=${contractAddress}&tokenId=${tokenId}&chainId=${chainId}&ownerAddress=${ownerAddress}`,
+        `${apiUrl}?contractAddress=${contractAddress}&tokenId=${tokenId}&chainId=1&ownerAddress=${ownerAddress}`,
         {
           method: 'GET',
           headers: new Headers({
@@ -126,7 +179,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
           setModal('Pass Generated')
           setPlatform(json.platform)
         } else {
-          validateHolder()
+          setModal('Select Platform')
         }
       } else {
         setErrorMessage(`${response.status}: ${response.statusText}`)
@@ -172,7 +225,7 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
     const payload = {
       contractAddress: nft.contractAddress,
       tokenId: nft.tokenId,
-      chainId: chainId,
+      chainId: 1,
       platform: platform,
       signature,
       signatureMessage,
@@ -273,13 +326,9 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                       <button
                         className="rounded-xl"
                         onClick={() => {
-                          setNft({
-                            contractAddress: nft.asset_contract.address,
-                            tokenId: parseInt(nft.token_id),
-                          })
-                          setModal('Select Platform')
+                          checkExistingPass(address, nft.asset_contract.address, nft.token_id)
                         }}
-                        key={parseInt(nft.token_id)}
+                        key={nft.token_id}
                       >
                         {nft.animation_url ? (
                           <div className="relative">
@@ -291,30 +340,28 @@ const GeneratePass: React.FC<GeneratePassProps> = ({
                             >
                               <source src={nft.animation_url} type="video/mp4" />
                             </video>
-                            <div
-                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
-                              style={{
-                                background:
-                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
-                              }}
-                            >
-                              #{nft.token_id}
+                            <div className="absolute inset-0 flex items-end p-2">
+                              <div className="py-1 px-2 rounded bg-black/60 text-xs font-medium text-white">
+                                #
+                                {nft.token_id.length <= 12
+                                  ? nft.token_id
+                                  : `${nft.token_id.slice(0, 4)}...${nft.token_id.slice(-4)}`}
+                              </div>
                             </div>
                           </div>
                         ) : (
                           <div className="relative">
                             <img
-                              className="w-40 h-40 bg-black border rounded-xl"
+                              className="w-40 h-40 bg-black border rounded-xl object-cover"
                               src={nft.image_url}
                             />
-                            <div
-                              className="absolute inset-0 flex items-end justify-center rounded-xl h-full w-full text-white text-sm p-2"
-                              style={{
-                                background:
-                                  'linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(24,24,27,1))',
-                              }}
-                            >
-                              #{nft.token_id}
+                            <div className="absolute inset-0 flex items-end p-2">
+                              <div className="py-1 px-2 rounded bg-black/60 text-xs font-medium text-white">
+                                #
+                                {nft.token_id.length <= 12
+                                  ? nft.token_id
+                                  : `${nft.token_id.slice(0, 4)}...${nft.token_id.slice(-4)}`}
+                              </div>
                             </div>
                           </div>
                         )}
